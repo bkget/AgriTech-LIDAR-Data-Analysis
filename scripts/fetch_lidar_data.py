@@ -207,3 +207,26 @@ class FetchLidarData():
         return self.DEFAULT_LOCATION + filtered_df["filename"] + "/ept.json", filtered_df["region"]
 
 
+    def get_data(self):
+        """Retrieves Data from the AWS Dataset, builds the cloud points from it and 
+        assignes and stores the original cloud points and original elevation geopandas dataframe.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+        """
+        try:
+            self.data_count = self.pipeline.execute()
+            self.create_cloud_points()
+            self.original_cloud_points = self.cloud_points
+            self.original_elevation_geodf = self.get_elevation_geodf()
+            get_logger("Data is retrieved successfully")
+
+        except Exception as e:
+            print("Failed to retrieve the data.")
+            sys.exit(1) 
+
