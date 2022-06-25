@@ -170,4 +170,40 @@ class FetchLidarData():
         else:
             print('Region is Not Available')
 
-   
+    def get_region_from_bounds(self, minx: float, miny: float, maxx: float, maxy: float, indx: int = 1) -> str:
+        """Searchs for a region which satisfies the polygon defined from the available boundaries in the AWS 
+        dataset.
+        Parameters
+        ----------
+        minx : float
+            Minimum longitude value of the polygon
+        miny : float
+            Minimum latitude value of the polygon
+        maxx : float
+            Maximum longitude value of the polygon
+        maxy : float
+            Maximum latitude value of the polygon
+        indx : int, optional
+            Bound indexing, to select the first or other access url's of multiple values for a region
+        Returns
+        -------
+        str
+            Access url to retrieve the data from the AWS dataset
+        --------------------------
+        Args:
+            bounds (Bounds): Geometry object describing the boundary of interest for fetching point cloud data
+
+        Returns:
+            pd.DataFrame: Resource metadata for regions enclosing the given boundary.
+        """
+
+        filtered_df = self._metadata.loc[
+            (self._metadata['xmin'] <= minx)
+            & (self._metadata['xmax'] >= maxx)
+            & (self._metadata['ymin'] <= miny)
+            & (self._metadata['ymax'] >= maxy)
+        ]
+
+        return self.DEFAULT_LOCATION + filtered_df["filename"] + "/ept.json", filtered_df["region"]
+
+
