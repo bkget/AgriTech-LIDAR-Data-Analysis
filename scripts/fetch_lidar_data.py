@@ -257,4 +257,31 @@ class FetchLidarData():
             sys.exit(1)
 
 
-   
+    def get_elevation_geodf(self) -> gpd.GeoDataFrame:
+        """Calculates and returns a geopandas elevation dataframe from the cloud points generated before.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        gpd.GeoDataFrame
+            Geopandas Dataframe with Elevation and coordinate points referenced as Geometry points
+        """
+        elevation = gpd.GeoDataFrame()
+        elevations = []
+        points = []
+        for row in self.cloud_points:
+            elevations.append(row[2])
+            point = Point(row[0], row[1])
+            points.append(point)
+
+        elevation['elevation'] = elevations
+        elevation['geometry'] = points
+        elevation.set_crs(epsg=self.epsg, inplace=True)
+
+        self.elevation_geodf = elevation
+
+        return self.elevation_geodf
+
