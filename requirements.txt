@@ -2,6 +2,7 @@ geopandas
 imageio
 pandas
 pathlib
+pdal
 matplotlib
 mapclassify
 numpy
