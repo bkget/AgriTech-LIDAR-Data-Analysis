@@ -151,3 +151,23 @@ class FetchLidarData():
                 'Failed to Extract Polygon Edges and Polygon Cropping Bounds')
 
 
+    def check_region(self, region: str) -> str:
+        """Checks if a region provided is within the file name folders in the AWS dataset.
+        Parameters
+        ----------
+        region : str
+            Proabable file name of a folder in the AWS dataset
+        Returns
+        -------
+        str
+            Returns the same regions folder file name if it was successfully located
+        """
+        with open('../data/usgs_3dep_regions_name.txt', 'r') as locations:
+            locations_list = locations.readlines()
+
+        if(region in locations_list):
+            return region
+        else:
+            print('Region is Not Available')
+
+   
