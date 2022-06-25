@@ -285,3 +285,19 @@ class FetchLidarData():
 
         return self.elevation_geodf
 
+if __name__ == "__main__":
+    MINX, MINY, MAXX, MAXY = [-93.756155, 41.918015, -93.747334, 41.921429]
+    polygon = Polygon(((MINX, MINY), (MINX, MAXY),
+                       (MAXX, MAXY), (MAXX, MINY), (MINX, MINY)))
+
+    df = FetchLidarData(polygon=polygon, region="IA_FullState", epsg="4326")
+
+    bounds = ([-10425171.940, -10423171.940], [5164494.710, 5166494.710])
+
+    df.load_pipeline("IA_FullState", bounds, "4326")
+
+    df.get_data()
+
+    elevation = df.elevation_geodf()
+
+    elevation.sample(10)
