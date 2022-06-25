@@ -110,3 +110,44 @@ class FetchLidarData():
             print('Failed to Load Pdal Pipeline')
 
 
+    def get_polygon_edges(self, polygon: Polygon, epsg: str) -> tuple:
+        """To extract polygon bounds and assign polygon cropping bounds.
+
+        Parameters
+        ----------
+        polygon : Polygon
+            Polygon object describing the boundary of the location required
+        epsg : str
+            CRS system on which the polygon is constructed on
+
+        Returns
+        -------
+        tuple
+            Returns bounds of the polygon provided(minx, miny, maxx, maxy)
+        """
+        try:
+            grid = gpd.GeoDataFrame([polygon], columns=["geometry"])
+            grid.set_crs(epsg=epsg, inplace=True)
+
+            grid['geometry'] = grid.geometry.to_crs(epsg=3857)
+
+            minx, miny, maxx, maxy = grid.geometry[0].bounds
+            # bounds: ([minx, maxx], [miny, maxy])
+            self.extraction_bounds = f"({[minx, maxx]},{[miny,maxy]})"
+
+            # Cropping Bounds
+            self.polygon_cropping = self.get_crop_polygon(grid.geometry[0])
+
+            grid['geometry'] = grid.geometry.to_crs(epsg=epsg)
+            self.geo_df = grid
+
+            get_logger.info(
+                'Successfully Extracted Polygon Edges and Polygon Cropping Bounds')
+
+            return minx, miny, maxx, maxy
+
+        except Exception as e:
+            print(
+                'Failed to Extract Polygon Edges and Polygon Cropping Bounds')
+
+
