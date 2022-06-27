@@ -1,5 +1,6 @@
-import sys
-# import pdal
+import sys, os
+from textwrap import indent
+import pdal
 import json
 import laspy
 import numpy as np
@@ -13,43 +14,49 @@ from logger import get_logger
 
 class FetchLidarData():
 
-    def __init__(self, polygon: Polygon, epsg: str, region: str = '') -> None:
+    def __init__(self, polygon: Polygon, epsg: int, region: str = '') -> None:
         try:   
             self._file_handler = FileHandler()
+            self._logger = get_logger("FetchLidarData")
             self.DEFAULT_LOCATION = "https://s3-us-west-2.amazonaws.com/usgs-lidar-public/"
-            minx, miny, maxx, maxy = self.get_polygon_edges(polygon, epsg)
+            self.polygon = polygon
+            self.epsg = epsg            
+            
+            minx, miny, maxx, maxy = self.get_polygon_edges(self.polygon, self.epsg)
             self._metadata = self._file_handler.read_csv("usgs_3dep_metadata")
-            self.epsg = epsg
             self.boundary = ([minx, miny] , [maxx, maxy])
-
+            
             if(region != ''):
                 self.region = self.check_region(region)
                 self.file_location = self.DEFAULT_LOCATION + self.region + "/ept.json"
             else:
                 self.file_location, self.region = self.get_region_from_bounds(minx, miny, maxx, maxy)
             
-            print(self.region)
+            print("The name of the region is: ", self.region)
 
-            self.load_pipeline(self.region, self.boundary, self.epsg)           
+            self.pipeline = self.get_pipeline(self.region, self.boundary, self.epsg)  
 
-            get_logger.info('Successfully Instantiated DataFetcher Class Object') 
+            self._logger.info('Successfully Instantiated DataFetcher Class Object') 
          
         except Exception as e:
-            print(f"Fail to initialize FetchLidarData Class. {e}")
+            self._logger.exception(f"Fail to initialize FetchLidarData Class. {e}")
 
 
-    def load_pipeline(self, region: str, bounds: Bounds, epsg:str) -> None:
-        """Loads Pipeline Template to constructe Pdal Pipelines from.
+    def get_pipeline(self, region: str, bounds: Bounds, epsg:int) -> pdal.Pipeline:
+        """Loads Geographic LiDAR Pipeline data 
 
         Parameters
         ----------
-        file_name : str, optional
-            Path plus file name of the pipeline template if the template is not located in its normal locations,
-            or if another template file is needed to be loaded
+        region (str): this argument inputs the name of the region to extract the pipeline data
+        bounds (tuple): these are coordinates in the form of latitude and longitude 
+        epsg (int): this argument specifies the input coordinate reference system
+       
+        returns:
+            gpd (geopandas Dataframe): returns a geopandas dataframe
 
         Returns
         -------
-        None
+        Pdal pipeline object
         """
         try:
             pipeline = {
@@ -61,7 +68,7 @@ class FetchLidarData():
                         "tag": "readdata"
                     },
                     {
-                        "limits": "Classification[7:7]",
+                        "limits": "Classification![7:7]",
                         "type": "filters.range",
                         "tag": "nonoise"
                     },
@@ -101,23 +108,26 @@ class FetchLidarData():
                         "window_size": 6
                     }
                 ]
-            }
-            print( pipeline)
+            }            
+            
+            pipe = pdal.Pipeline(json.dumps(pipeline))
+            
+            self._logger.info('Successfully get Pipeline data')
 
-            get_logger.info('Successfully Loaded Pdal Pipeline')
+            return pipe
 
         except Exception as e:
-            print('Failed to Load Pdal Pipeline')
+            self._logger.exception('Failed to get Pdal Pipeline')
 
-
-    def get_polygon_edges(self, polygon: Polygon, epsg: str) -> tuple:
+    
+    def get_polygon_edges(self, polygon: Polygon, epsg: int) -> tuple:
         """To extract polygon bounds and assign polygon cropping bounds.
 
         Parameters
         ----------
         polygon : Polygon
             Polygon object describing the boundary of the location required
-        epsg : str
+        epsg : int
             CRS system on which the polygon is constructed on
 
         Returns
@@ -134,23 +144,42 @@ class FetchLidarData():
             minx, miny, maxx, maxy = grid.geometry[0].bounds
             # bounds: ([minx, maxx], [miny, maxy])
             self.extraction_bounds = f"({[minx, maxx]},{[miny,maxy]})"
-
+            
             # Cropping Bounds
             self.polygon_cropping = self.get_crop_polygon(grid.geometry[0])
 
             grid['geometry'] = grid.geometry.to_crs(epsg=epsg)
             self.geo_df = grid
-
-            get_logger.info(
-                'Successfully Extracted Polygon Edges and Polygon Cropping Bounds')
-
+            
+            self._logger.info('Successfully Extracted Polygon Edges and Polygon Cropping Bounds')
+            
             return minx, miny, maxx, maxy
 
         except Exception as e:
-            print(
-                'Failed to Extract Polygon Edges and Polygon Cropping Bounds')
+            self._logger.exception('Failed to Extract Polygon Edges and Polygon Cropping Bounds')
 
+    def get_crop_polygon(self, polygon: Polygon) -> str:
+        """Calculates Polygons Cropping string used when building Pdal's crop pipeline.
 
+        Parameters
+        ----------
+        polygon: Polygon
+            Polygon object describing the boundary of the location required
+
+        Returns
+        -------
+        str
+            Cropping string used by Pdal's crop pipeline
+        """
+        polygon_cords = 'POLYGON(('
+        for i in list(polygon.exterior.coords):
+            polygon_cords += f'{i[0]} {i[1]},'
+
+        polygon_cords = polygon_cords[:-1] + '))'
+
+        return polygon_cords
+
+        
     def check_region(self, region: str) -> str:
         """Checks if a region provided is within the file name folders in the AWS dataset.
         Parameters
@@ -163,16 +192,15 @@ class FetchLidarData():
             Returns the same regions folder file name if it was successfully located
         """
         with open('../data/usgs_3dep_regions_name.txt', 'r') as locations:
-            locations_list = locations.readlines()
+            locations_list = locations.read().splitlines()
 
         if(region in locations_list):
             return region
         else:
-            print('Region is Not Available')
+            self._logger.exception('Region is Not Available')
 
     def get_region_from_bounds(self, minx: float, miny: float, maxx: float, maxy: float, indx: int = 1) -> str:
-        """Searchs for a region which satisfies the polygon defined from the available boundaries in the AWS 
-        dataset.
+        """Searchs for a region which satisfies the polygon defined from the available boundaries in AWS dataset.
         Parameters
         ----------
         minx : float
@@ -221,13 +249,16 @@ class FetchLidarData():
         """
         try:
             self.data_count = self.pipeline.execute()
+            print("Fetching Point Cloud Data Complete!")
+
             self.create_cloud_points()
             self.original_cloud_points = self.cloud_points
             self.original_elevation_geodf = self.get_elevation_geodf()
-            get_logger("Data is retrieved successfully")
+            
+            self._logger.info("Data is retrieved successfully")
 
         except Exception as e:
-            print("Failed to retrieve the data.")
+            self._logger.exception("Failed to retrieve the data.")
             sys.exit(1) 
 
 
@@ -244,7 +275,8 @@ class FetchLidarData():
         """
         try:
             cloud_points = []
-            for row in self.get_pipeline_arrays()[0]:
+            pipeline_arrays = self.pipeline.arrays
+            for row in pipeline_arrays[0]:
                 lst = row.tolist()[-3:]
                 cloud_points.append(lst)
 
@@ -253,7 +285,7 @@ class FetchLidarData():
             self.cloud_points = cloud_points
 
         except:
-            print('Failed to create cloud points')
+            self._logger.exception('Failed to create cloud points')
             sys.exit(1)
 
 
@@ -287,17 +319,16 @@ class FetchLidarData():
 
 if __name__ == "__main__":
     MINX, MINY, MAXX, MAXY = [-93.756155, 41.918015, -93.747334, 41.921429]
-    polygon = Polygon(((MINX, MINY), (MINX, MAXY),
-                       (MAXX, MAXY), (MAXX, MINY), (MINX, MINY)))
+    polygon = Polygon(((MINX, MINY), 
+                       (MINX, MAXY),
+                       (MAXX, MAXY), 
+                       (MAXX, MINY), 
+                       (MINX, MINY)) )
 
-    df = FetchLidarData(polygon=polygon, region="IA_FullState", epsg="4326")
-
-    bounds = ([-10425171.940, -10423171.940], [5164494.710, 5166494.710])
-
-    df.load_pipeline("IA_FullState", bounds, "4326")
+    df = FetchLidarData(polygon=polygon, region="IA_FullState", epsg=4326) 
 
     df.get_data()
 
-    elevation = df.elevation_geodf()
+    elevation = df.get_elevation_geodf()
 
     elevation.sample(10)
