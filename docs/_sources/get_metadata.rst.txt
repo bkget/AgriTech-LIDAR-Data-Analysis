@@ -1,0 +1,7 @@
+get\_metadata module
+====================
+
+.. automodule:: get_metadata
+   :members:
+   :undoc-members:
+   :show-inheritance:
