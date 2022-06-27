@@ -22,7 +22,7 @@ class FileHandler():
     """
 
     try:
-      path = Config.ASSETS_PATH / str(name + '.csv')
+      path = Config.DATA_PATH / str(name + '.csv')
       df.to_csv(path, index=index)
       self._logger.info(f"{name} is saved successfully in csv format")
     except Exception:
@@ -39,7 +39,7 @@ class FileHandler():
         pd.DataFrame: dataframe
     """
     try:
-      path = Config.ASSETS_PATH / str(name + '.csv')
+      path = Config.DATA_PATH / str(name + '.csv')
       df = pd.read_csv(path, na_values=missing_values)
       self._logger.info(f"{name} read successfully")
       return df
@@ -56,7 +56,7 @@ class FileHandler():
         dict: Python dictionary
     """
     try:
-      path = Config.ASSETS_PATH / str(name + '.json')
+      path = Config.DATA_PATH / str(name + '.json')
       with open(path, 'r') as json_file:
         json_obj = json.load(json_file)
       self._logger.info(f"{name} read successfully")
@@ -74,7 +74,7 @@ class FileHandler():
         list: List of text line by line
     """
     try:
-      path = Config.ASSETS_PATH / str(name + '.txt')
+      path = Config.DATA_PATH / str(name + '.txt')
       with open(path, "r") as f:
         text_file = f.read().splitlines()
       self._logger.info(f"{name} read successfully")
